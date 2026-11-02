@@ -11,7 +11,7 @@ node --check dist/app-config.mjs
 node --test tests/app-handoff.test.mjs
 ```
 
-The versioned BONC Stories Supabase signup-confirmation email, local preview command, and dashboard setup guide are in [`email-templates/`](email-templates/README.md). This template does not configure email delivery or confirmation routing.
+The versioned BONC Stories Supabase signup-confirmation and password-recovery emails, local preview command, and development-only dashboard setup guide are in [`email-templates/`](email-templates/README.md). These templates do not configure email delivery or authentication routing.
 
 ## Launch destinations
 
