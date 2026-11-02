@@ -1,0 +1,15 @@
+BONC STORIES
+
+Confirm your email
+
+You received this message because this email address was used to create a BONC Stories account. Confirm it to finish signing up:
+
+{{ .ConfirmationURL }}
+
+Or enter this verification code in the app:
+
+{{ .Token }}
+
+If you didn't create this account, you can ignore this email. No action is required.
+
+Sent for a BONC Stories account request by BONC Studios.

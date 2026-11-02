@@ -11,6 +11,8 @@ node --check dist/app-config.mjs
 node --test tests/app-handoff.test.mjs
 ```
 
+The versioned BONC Stories Supabase signup-confirmation email, local preview command, and dashboard setup guide are in [`email-templates/`](email-templates/README.md). This template does not configure email delivery or confirmation routing.
+
 ## Launch destinations
 
 `dist/app-config.mjs` is the only destination configuration. All URLs are intentionally null until published, verified destinations are supplied. Do not insert guessed identifiers, custom schemes, dummy links or store badges.
