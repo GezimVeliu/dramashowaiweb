@@ -4,7 +4,7 @@ Confirm your email
 
 You received this message because this email address was used to create a BONC Stories account. Confirm it to finish signing up:
 
-{{ .ConfirmationURL }}
+https://web.dramashowai.workers.dev/auth/confirm/#token_hash={{ .TokenHash }}&type=signup
 
 Or enter this verification code in the app:
 

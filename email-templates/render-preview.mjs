@@ -12,6 +12,7 @@ for (const file of ['confirm-signup.html', 'reset-password.html']) {
   const source = await readFile(join(root, file), 'utf8');
   const preview = source
     .replaceAll('{{ .ConfirmationURL }}', previewUrl)
+    .replaceAll('{{ .TokenHash }}', 'PREVIEW-TOKEN-HASH-NOT-REAL')
     .replaceAll('{{ .Token }}', 'PREVIEW');
   const output = preview.replace(/<body([^>]*)>/, `<body$1>${banner}`);
   await writeFile(join(outputDir, file), output);

@@ -8,10 +8,34 @@ This is a buildless static site. Serve `dist/` over HTTP for local preview. Run:
 node --check dist/app.js
 node --check dist/stories.js
 node --check dist/app-config.mjs
-node --test tests/app-handoff.test.mjs
+node --test tests/*.test.mjs
 ```
 
 The versioned BONC Stories Supabase signup-confirmation and password-recovery emails, local preview command, and development-only dashboard setup guide are in [`email-templates/`](email-templates/README.md). These templates do not configure email delivery or authentication routing.
+
+## Signup confirmation deployment
+
+The public confirmation destination is exactly `https://web.dramashowai.workers.dev/auth/confirm/`. The email template sends its one-time `TokenHash` in the URL fragment, so it is not included in the request to Cloudflare. The page exchanges it directly with the Bonc Show Video Supabase project, checks that the returned user is confirmed, removes credentials from browser history, and only then offers the fixed `bonc://auth/confirmed` app handoff. It never accepts a caller-supplied return URL.
+
+### Owner dashboard configuration (not applied by this repository)
+
+In Supabase project **Bonc Show Video** (`xbkfudvnewhescwbmrgt`):
+
+1. Open **Authentication → URL Configuration**.
+2. Set **Site URL** to `https://web.dramashowai.workers.dev` (no localhost value).
+3. Add `https://web.dramashowai.workers.dev/auth/confirm/` to **Redirect URLs**. Remove production-facing localhost entries after confirming no development client relies on them; never use a wildcard for this route.
+4. Keep **Confirm email** enabled under the email provider settings.
+5. In the native signup call, set `options.emailRedirectTo` to `https://web.dramashowai.workers.dev/auth/confirm/`. Do not pass `localhost`, the old ChatGPT preview, or `dramashowaiweb.dramashowai.workers.dev`.
+6. Apply the versioned **Confirm signup** template as described in `email-templates/README.md`. These dashboard steps require owner access and have **not** been performed or verified from this repository.
+
+### Deployment and QA checklist
+
+- Deploy `dist/` to the existing `web.dramashowai.workers.dev` Worker and confirm the route returns HTTPS with the expected page and no redirect to localhost.
+- With a fresh disposable address, sign up in the native app and inspect the received link: its origin/path must be the canonical confirmation route, and neither its URL nor redirects may contain localhost.
+- Click the newest link once; verify the success state, then use **Open BONC** and verify the native handler restores the supplied session and shows the confirmed account. Reopen the consumed link and verify the invalid/expired state.
+- Repeat with an intentionally malformed token and an expired email; verify neither offers an app handoff. Request a replacement and verify only the newest email succeeds.
+- Sign up another disposable account and enter the `{{ .Token }}` code in the waiting native app; verify `verifyOtp({ email, token, type: 'signup' })` establishes the session without using the web link.
+- Record browser/device, email timestamp, redacted destination, confirmation result, app-return result, and cleanup. Do not mark BONC-36 done until the deployed link, OTP, invalid/expired, and app-return cases pass. External delivery remains dependent on BONC-27.
 
 ## Launch destinations
 
