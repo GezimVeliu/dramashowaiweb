@@ -78,3 +78,9 @@ Use a different BONC-29-approved disposable identity for each signup case. Never
 | Android | Deferred | Deferred | Track with BONC-24 when an Android build/device exists |
 
 Before executing this matrix, the owner must verify **Confirm email** is enabled, both exact callback URLs are allowlisted, the approved templates are installed, and Resend custom SMTP is healthy (BONC-27/BONC-36/BONC-38/BONC-39). Apple Sign-In remains off; Google Sign-In is not part of this implementation.
+
+## Account library and cross-device sync
+
+Authenticated viewers can open `/account/` to review Favorites, Continue Watching, and Watched activity. The browser uses the existing Supabase session and the existing `watchlist`, `watch_progress`, `series`, and `episodes` tables; it creates no parallel schema and never supplies a `user_id`. Supabase RLS derives ownership from the bearer token. Favorite changes on the discovery page are written to `watchlist`, while episode progress remains read-only on the web because full playback belongs in the native app.
+
+The account UI deliberately labels every episode action **Continue in App**. App links remain disabled until `dist/app-config.mjs` contains a verified HTTPS destination. Live cross-device and account-isolation acceptance still requires BONC-29-approved disposable identities against the deployed site; unit tests exercise request shape and presentation logic, not production RLS.
