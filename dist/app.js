@@ -1,5 +1,7 @@
 import { stories } from './stories.js';
 import { appConfig, detectPlatform, getAppDestinations } from './app-config.mjs';
+import { addFavorite, findSeriesByTitle, loadLibrary, removeFavorite } from './account/account-data.mjs';
+import { getUser, refreshSession } from './auth/auth-flow.mjs';
 
 const $ = id => document.getElementById(id);
 const cats = ['All stories', 'Drama', 'Family', 'Coming of age', 'Sports'];
@@ -9,6 +11,7 @@ try {
   if (!Array.isArray(saved)) saved = [];
 } catch { saved = []; }
 let filter = 'All stories', listOnly = false, current = null;
+let accountSession = null, remoteSeries = new Map();
 let detailFocus, appFocus, toastTimer;
 let appContent = null;
 try {
@@ -55,7 +58,8 @@ function render() {
     img.parentElement.style.background = 'linear-gradient(145deg,#46533b,#192419 65%,#686344)';
   });
 }
-function save(id) {
+async function save(id) {
+  const wasSaved = saved.includes(id);
   saved = saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id];
   let persisted = true;
   try { localStorage.setItem('bonc-list', JSON.stringify(saved)); } catch { persisted = false; }
@@ -65,7 +69,36 @@ function save(id) {
     $('saveDetail').setAttribute('aria-pressed', String(saved.includes(current)));
   }
   showToast((saved.includes(id) ? 'Added to your list' : 'Removed from your list')
-    + (persisted ? '' : ' · For this visit only'));
+    + (accountSession ? ' · Synced with your account' : (persisted ? ' · Sign in to sync' : ' · For this visit only')));
+  if (accountSession) {
+    try {
+      let catalog = remoteSeries.get(id);
+      if (!catalog) { catalog = await findSeriesByTitle(accountSession.access_token, stories.find(s => s.id === id)?.title); if (catalog) remoteSeries.set(id, catalog); }
+      if (!catalog) throw new Error('This story is not in the app catalog yet.');
+      if (wasSaved) await removeFavorite(accountSession.access_token, catalog.id); else await addFavorite(accountSession.access_token, catalog.id);
+    } catch (error) {
+      saved = wasSaved ? [...saved, id] : saved.filter(value => value !== id); render();
+      showToast(`${error.message} Your local list was restored.`);
+    }
+  }
+}
+
+async function connectAccount() {
+  try { accountSession = JSON.parse(localStorage.getItem('bonc-auth-session')); } catch { accountSession = null; }
+  if (!accountSession?.access_token) return;
+  try {
+    let user;
+    try { user = await getUser(accountSession.access_token); }
+    catch { accountSession = await refreshSession(accountSession.refresh_token); localStorage.setItem('bonc-auth-session', JSON.stringify(accountSession)); user = await getUser(accountSession.access_token); }
+    const library = await loadLibrary(accountSession.access_token);
+    const synced = [];
+    for (const favorite of library.favorites) {
+      const story = stories.find(item => item.title === favorite.series.title);
+      if (story) { synced.push(story.id); remoteSeries.set(story.id, favorite.series); }
+    }
+    saved = synced; localStorage.setItem('bonc-list', JSON.stringify(saved)); render();
+    const link = document.querySelector('.account-link'); link.textContent = 'My BONC'; link.href = '/account/'; link.setAttribute('aria-label', `Open account for ${user.email || 'signed-in viewer'}`);
+  } catch { /* Keep guest discovery available when the session or network is stale. */ }
 }
 function openSeries(id, trigger = document.activeElement) {
   const s = stories.find(x => x.id === id);
@@ -181,3 +214,4 @@ $('searchBtn').onclick = () => {
 $('query').oninput = render;
 $('studioBtn').onclick = () => { setCollection(false); filter = 'All stories'; render(); $('series').scrollIntoView({ behavior: 'smooth' }); };
 render();
+connectAccount();
