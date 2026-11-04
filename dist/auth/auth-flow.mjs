@@ -1,5 +1,5 @@
 export const apiUrl = 'https://xbkfudvnewhescwbmrgt.supabase.co/auth/v1';
-const apiKey = 'sb_publishable_Qt4aAXF6GepS-reTaFvzmQ_0CwElQK1';
+export const apiKey = 'sb_publishable_Qt4aAXF6GepS-reTaFvzmQ_0CwElQK1';
 export const confirmationUrl = 'https://web.dramashowai.workers.dev/auth/confirm/';
 export const recoveryUrl = 'https://web.dramashowai.workers.dev/auth/';
 

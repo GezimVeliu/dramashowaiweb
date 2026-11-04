@@ -1,5 +1,8 @@
 import { stories } from './stories.js';
 import { appConfig, detectPlatform, getAppDestinations } from './app-config.mjs';
+import { addFavorite, findSeriesByTitle, loadLibrary, removeFavorite } from './account/account-data.mjs';
+import { avatarProfile } from './account/account-ui.mjs';
+import { getUser, refreshSession, signOut } from './auth/auth-flow.mjs';
 
 const $ = id => document.getElementById(id);
 const cats = ['All stories', 'Drama', 'Family', 'Coming of age', 'Sports'];
@@ -9,6 +12,7 @@ try {
   if (!Array.isArray(saved)) saved = [];
 } catch { saved = []; }
 let filter = 'All stories', listOnly = false, current = null;
+let accountSession = null, remoteSeries = new Map();
 let detailFocus, appFocus, toastTimer;
 let appContent = null;
 try {
@@ -55,7 +59,8 @@ function render() {
     img.parentElement.style.background = 'linear-gradient(145deg,#46533b,#192419 65%,#686344)';
   });
 }
-function save(id) {
+async function save(id) {
+  const wasSaved = saved.includes(id);
   saved = saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id];
   let persisted = true;
   try { localStorage.setItem('bonc-list', JSON.stringify(saved)); } catch { persisted = false; }
@@ -65,8 +70,63 @@ function save(id) {
     $('saveDetail').setAttribute('aria-pressed', String(saved.includes(current)));
   }
   showToast((saved.includes(id) ? 'Added to your list' : 'Removed from your list')
-    + (persisted ? '' : ' · For this visit only'));
+    + (accountSession ? ' · Synced with your account' : (persisted ? ' · Sign in to sync' : ' · For this visit only')));
+  if (accountSession) {
+    try {
+      let catalog = remoteSeries.get(id);
+      if (!catalog) { catalog = await findSeriesByTitle(accountSession.access_token, stories.find(s => s.id === id)?.title); if (catalog) remoteSeries.set(id, catalog); }
+      if (!catalog) throw new Error('This story is not in the app catalog yet.');
+      if (wasSaved) await removeFavorite(accountSession.access_token, catalog.id); else await addFavorite(accountSession.access_token, catalog.id);
+    } catch (error) {
+      saved = wasSaved ? [...saved, id] : saved.filter(value => value !== id); render();
+      showToast(`${error.message} Your local list was restored.`);
+    }
+  }
 }
+
+async function connectAccount() {
+  try { accountSession = JSON.parse(localStorage.getItem('bonc-auth-session')); } catch { accountSession = null; }
+  if (!accountSession?.access_token) return;
+  try {
+    let user;
+    try { user = await getUser(accountSession.access_token); }
+    catch { accountSession = await refreshSession(accountSession.refresh_token); localStorage.setItem('bonc-auth-session', JSON.stringify(accountSession)); user = await getUser(accountSession.access_token); }
+    showAccountControl(user);
+    const library = await loadLibrary(accountSession.access_token);
+    const synced = [];
+    for (const favorite of library.favorites) {
+      const story = stories.find(item => item.title === favorite.series.title);
+      if (story) { synced.push(story.id); remoteSeries.set(story.id, favorite.series); }
+    }
+    saved = synced; localStorage.setItem('bonc-list', JSON.stringify(saved)); render();
+  } catch { /* Keep guest discovery available when the session or network is stale. */ }
+}
+function showAccountControl(user) {
+  const profile = avatarProfile(user);
+  $('getStarted').classList.add('hidden');
+  $('avatarInitial').textContent = profile.initials;
+  $('avatarButton').style.setProperty('--avatar-color', profile.color);
+  $('avatarButton').setAttribute('aria-label', `Open account menu for ${user.email || 'signed-in viewer'}`);
+  $('accountEmail').textContent = user.email || 'Signed in';
+  $('avatarButton').classList.remove('hidden');
+}
+function closeAccountMenu() { $('accountMenu').classList.add('hidden'); $('avatarButton').setAttribute('aria-expanded', 'false'); }
+$('avatarButton').onclick = () => {
+  const open = $('accountMenu').classList.toggle('hidden') === false;
+  $('avatarButton').setAttribute('aria-expanded', String(open));
+  if (open) $('accountMenu').querySelector('[role="menuitem"]').focus();
+};
+$('headerLogout').onclick = async () => {
+  $('headerLogout').disabled = true;
+  try { await signOut(accountSession.access_token); } catch { /* Expired sessions are still removed locally. */ }
+  localStorage.removeItem('bonc-auth-session');
+  accountSession = null; saved = [];
+  try { localStorage.setItem('bonc-list', '[]'); } catch { /* Optional storage. */ }
+  closeAccountMenu(); $('avatarButton').classList.add('hidden'); $('getStarted').classList.remove('hidden'); render();
+  showToast('You are signed out on this device');
+};
+document.addEventListener('click', event => { if (!event.target.closest('.account-control')) closeAccountMenu(); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('accountMenu').classList.contains('hidden')) { closeAccountMenu(); $('avatarButton').focus(); } });
 function openSeries(id, trigger = document.activeElement) {
   const s = stories.find(x => x.id === id);
   if (!s) return;
@@ -181,3 +241,4 @@ $('searchBtn').onclick = () => {
 $('query').oninput = render;
 $('studioBtn').onclick = () => { setCollection(false); filter = 'All stories'; render(); $('series').scrollIntoView({ behavior: 'smooth' }); };
 render();
+connectAccount();
