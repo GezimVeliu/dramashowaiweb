@@ -55,3 +55,26 @@ All five original series, artwork references, descriptions and 25 proposed episo
 Premium/Unlock actions only open the app handoff panel. No premium media URLs, web player, web checkout, server routes or authorization backend exist. This static UX is not an access-control security boundary. Any future premium media API must authorize entitlements on the server before issuing playback access; never ship premium playback URLs in the public catalog.
 
 The native app remains planned as React Native without Expo, with local Xcode/Android Studio builds. Supabase and Mux remain proposed services. This website change provisions neither service and implements no mobile app.
+
+## BONC-46 web auth implementation and QA boundary
+
+The website account page is available at `/auth/`. It implements email/password signup, confirmation-code entry with resend, existing-account sign-in, local sign-out, session refresh, and password recovery/update against the **Bonc Show Video** Supabase project. Signup and resend use the fixed confirmation destination; recovery uses the fixed `/auth/` destination. Auth fragments are removed from browser history before any UI work, and credentials are never written to application logs or analytics.
+
+The web flow is automated at the request-contract and error-state level in `tests/auth-flow.test.mjs`. The production Supabase settings, SMTP delivery, Auth logs, deployed callback, disposable identities, and installed iOS application are outside this repository and were not accessed by this change. Therefore this is **not** real E2E evidence and does not satisfy the issue's final acceptance gate by itself.
+
+### Real E2E QA matrix (owner/device run required)
+
+Use a different BONC-29-approved disposable identity for each signup case. Never record a password, OTP, JWT, tokenized URL, SMTP key, or service-role key. Record only timestamp, platform/build, redacted identity, delivery/result, and corresponding redacted Supabase Auth/Resend event.
+
+| Journey | Web production | Installed iOS app | Evidence required |
+| --- | --- | --- | --- |
+| New signup + newest OTP | Not run | Not run | Email delivered; OTP accepted; confirmed user/session |
+| New signup + email link | Not run | Not run | Canonical HTTPS link; authenticated landing/native handoff |
+| Invalid, expired, reused, resent code/link | Not run | Not run | Accessible failure; newest resend succeeds; no session on failures |
+| Existing account sign-in/out | Not run | Not run | Sign-in, local logout, protected state removed |
+| Refresh/relaunch and second device | Not run | Not run | Session persists/refreshes; second device works |
+| Password recovery | Not run | Not run | Recovery delivery, password update, old password rejected |
+| Redirect/token safety | Static checks only | Not run | No localhost, unsupported redirect, token logs, or analytics payload |
+| Android | Deferred | Deferred | Track with BONC-24 when an Android build/device exists |
+
+Before executing this matrix, the owner must verify **Confirm email** is enabled, both exact callback URLs are allowlisted, the approved templates are installed, and Resend custom SMTP is healthy (BONC-27/BONC-36/BONC-38/BONC-39). Apple Sign-In remains off; Google Sign-In is not part of this implementation.
