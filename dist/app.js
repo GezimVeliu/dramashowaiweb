@@ -1,7 +1,8 @@
 import { stories } from './stories.js';
 import { appConfig, detectPlatform, getAppDestinations } from './app-config.mjs';
 import { addFavorite, findSeriesByTitle, loadLibrary, removeFavorite } from './account/account-data.mjs';
-import { getUser, refreshSession } from './auth/auth-flow.mjs';
+import { avatarProfile } from './account/account-ui.mjs';
+import { getUser, refreshSession, signOut } from './auth/auth-flow.mjs';
 
 const $ = id => document.getElementById(id);
 const cats = ['All stories', 'Drama', 'Family', 'Coming of age', 'Sports'];
@@ -90,6 +91,7 @@ async function connectAccount() {
     let user;
     try { user = await getUser(accountSession.access_token); }
     catch { accountSession = await refreshSession(accountSession.refresh_token); localStorage.setItem('bonc-auth-session', JSON.stringify(accountSession)); user = await getUser(accountSession.access_token); }
+    showAccountControl(user);
     const library = await loadLibrary(accountSession.access_token);
     const synced = [];
     for (const favorite of library.favorites) {
@@ -97,9 +99,34 @@ async function connectAccount() {
       if (story) { synced.push(story.id); remoteSeries.set(story.id, favorite.series); }
     }
     saved = synced; localStorage.setItem('bonc-list', JSON.stringify(saved)); render();
-    const link = document.querySelector('.account-link'); link.textContent = 'My BONC'; link.href = '/account/'; link.setAttribute('aria-label', `Open account for ${user.email || 'signed-in viewer'}`);
   } catch { /* Keep guest discovery available when the session or network is stale. */ }
 }
+function showAccountControl(user) {
+  const profile = avatarProfile(user);
+  $('getStarted').classList.add('hidden');
+  $('avatarInitial').textContent = profile.initials;
+  $('avatarButton').style.setProperty('--avatar-color', profile.color);
+  $('avatarButton').setAttribute('aria-label', `Open account menu for ${user.email || 'signed-in viewer'}`);
+  $('accountEmail').textContent = user.email || 'Signed in';
+  $('avatarButton').classList.remove('hidden');
+}
+function closeAccountMenu() { $('accountMenu').classList.add('hidden'); $('avatarButton').setAttribute('aria-expanded', 'false'); }
+$('avatarButton').onclick = () => {
+  const open = $('accountMenu').classList.toggle('hidden') === false;
+  $('avatarButton').setAttribute('aria-expanded', String(open));
+  if (open) $('accountMenu').querySelector('[role="menuitem"]').focus();
+};
+$('headerLogout').onclick = async () => {
+  $('headerLogout').disabled = true;
+  try { await signOut(accountSession.access_token); } catch { /* Expired sessions are still removed locally. */ }
+  localStorage.removeItem('bonc-auth-session');
+  accountSession = null; saved = [];
+  try { localStorage.setItem('bonc-list', '[]'); } catch { /* Optional storage. */ }
+  closeAccountMenu(); $('avatarButton').classList.add('hidden'); $('getStarted').classList.remove('hidden'); render();
+  showToast('You are signed out on this device');
+};
+document.addEventListener('click', event => { if (!event.target.closest('.account-control')) closeAccountMenu(); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('accountMenu').classList.contains('hidden')) { closeAccountMenu(); $('avatarButton').focus(); } });
 function openSeries(id, trigger = document.activeElement) {
   const s = stories.find(x => x.id === id);
   if (!s) return;

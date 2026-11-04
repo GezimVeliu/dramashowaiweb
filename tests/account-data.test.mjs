@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addFavorite, joinLibrary, loadLibrary, removeFavorite } from '../dist/account/account-data.mjs';
+import { avatarProfile } from '../dist/account/account-ui.mjs';
 
 const response = (payload, status = 200) => ({ ok: status < 400, status, json: async () => payload });
 test('joins user-owned watchlist and progress with public catalog records', () => {
@@ -20,4 +21,10 @@ test('favorite writes rely on RLS and update only the selected series', async ()
   const calls = []; const fetcher = async (url, options) => { calls.push({ url, options }); return response(null, 204); };
   await addFavorite('jwt', 'series-1', fetcher); await removeFavorite('jwt', 'series-1', fetcher);
   assert.deepEqual(JSON.parse(calls[0].options.body), { series_id: 'series-1' }); assert.match(calls[1].url, /series_id=eq.series-1/); assert.ok(calls.every(call => !String(call.options.body).includes('user_id')));
+});
+test('default avatars use account initials and a stable generated color', () => {
+  const first = avatarProfile({ id: 'viewer-1', email: 'anna@example.com' });
+  assert.equal(first.initials, 'A');
+  assert.deepEqual(first, avatarProfile({ id: 'viewer-1', email: 'anna@example.com' }));
+  assert.notEqual(first.color, avatarProfile({ id: 'viewer-2', email: 'ben@example.com' }).color);
 });
