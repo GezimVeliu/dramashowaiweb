@@ -56,6 +56,12 @@ Premium/Unlock actions only open the app handoff panel. No premium media URLs, w
 
 The native app remains planned as React Native without Expo, with local Xcode/Android Studio builds. Supabase and Mux remain proposed services. This website change provisions neither service and implements no mobile app.
 
+## Pilot waitlist and measurement
+
+The home page now presents an honest pilot funnel: trailer and pilot media remain visibly unavailable until approved URLs exist. The waitlist uses the existing Supabase Auth email-OTP flow, stores the consent version in user metadata, and asks the visitor to verify the address through the canonical confirmation destination. A successful browser request is not E2E proof of email delivery; production delivery and confirmation must be tested before publicly claiming the waitlist is operational.
+
+`dist/pilot-funnel.mjs` defines the only media and analytics configuration. Its analytics endpoint is intentionally `null` pending owner approval of a privacy-appropriate first-party collector. The page emits `bonc:analytics` browser events for CTA clicks and confirmation requests without email addresses or persistent identifiers; an approved collector can receive the same allowlisted event payload by setting the HTTPS endpoint. Trailer variant and pilot start/completion event names are reserved, but must only be wired when real approved players are added.
+
 ## BONC-46 web auth implementation and QA boundary
 
 The website account page is available at `/auth/`. It implements email/password signup, confirmation-code entry with resend, existing-account sign-in, local sign-out, session refresh, and password recovery/update against the **Bonc Show Video** Supabase project. Signup and resend use the fixed confirmation destination; recovery uses the fixed `/auth/` destination. Auth fragments are removed from browser history before any UI work, and credentials are never written to application logs or analytics.
