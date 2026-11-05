@@ -11,6 +11,8 @@ node --check dist/app-config.mjs
 node --test tests/*.test.mjs
 ```
 
+Run the complete local CI gate with `npm run ci`. Pull-request merge policy, current-SHA verification, production smoke checks, and reversible web/mobile release guidance are documented in [`docs/release-runbook.md`](docs/release-runbook.md).
+
 The versioned BONC Stories Supabase signup-confirmation and password-recovery emails, local preview command, and development-only dashboard setup guide are in [`email-templates/`](email-templates/README.md). These templates do not configure email delivery or authentication routing.
 
 ## Signup confirmation deployment
