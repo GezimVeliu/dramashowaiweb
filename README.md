@@ -52,7 +52,7 @@ Mobile visitors see their platform's available destination. Desktop visitors see
 
 ## Episodes and access
 
-All five original series, artwork references, descriptions and 25 proposed episode outlines are preserved. No finished video or free preview exists in this source, so every episode remains Coming soon. Future free preview playback needs a real, authorized preview asset and a deliberate implementation; adding store URLs does not enable videos.
+All five original series remain represented. The first series follows the approved 10-episode production plan; the other concepts deliberately omit unapproved episode plots. No finished video or free preview exists in this source, so every listed episode remains Coming soon. Future free preview playback needs a real, authorized preview asset and a deliberate implementation; adding store URLs does not enable videos. The public-claim audit and source mapping are recorded in [`docs/editorial-claims.md`](docs/editorial-claims.md).
 
 Premium/Unlock actions only open the app handoff panel. No premium media URLs, web player, web checkout, server routes or authorization backend exist. This static UX is not an access-control security boundary. Any future premium media API must authorize entitlements on the server before issuing playback access; never ship premium playback URLs in the public catalog.
 
