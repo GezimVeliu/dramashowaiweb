@@ -3,6 +3,7 @@ import { appConfig, detectPlatform, getAppDestinations } from './app-config.mjs'
 import { addFavorite, findSeriesByTitle, loadLibrary, removeFavorite } from './account/account-data.mjs';
 import { avatarProfile } from './account/account-ui.mjs';
 import { getUser, refreshSession, signOut } from './auth/auth-flow.mjs';
+import { assetManifest } from './asset-manifest.js';
 
 const $ = id => document.getElementById(id);
 const cats = ['All stories', 'Drama', 'Family', 'Coming of age', 'Sports'];
@@ -16,6 +17,8 @@ try {
 let filter = 'All stories', listOnly = false, current = null;
 let accountSession = null, remoteSeries = new Map();
 let detailFocus, appFocus, toastTimer;
+const approvedFor = use => assetManifest.assets.filter(asset => asset.use.includes(use));
+const picture = (asset, className) => `<picture><source type="image/avif" srcset="${asset.srcset.avif}"><source type="image/webp" srcset="${asset.srcset.webp}"><img class="${className}" src="${asset.fallback}" srcset="${asset.srcset.fallback}" sizes="${asset.sizes}" alt="${asset.alt}" loading="lazy" width="${asset.width}" height="${asset.height}"></picture>`;
 let appContent = null;
 try {
   const previous = JSON.parse(sessionStorage.getItem('bonc-app-content') || 'null');
@@ -129,7 +132,10 @@ function openSeries(id, trigger = document.activeElement) {
   if (!s) return;
   current = id;
   detailFocus = trigger;
-  $('detail').innerHTML = `<div class="detail-top"><img class="detail-art" src="${s.image}" alt="${s.title} concept artwork"><div class="detail-copy"><div class="eyebrow">Bonc original · ${s.genre}</div><h2 id="detailTitle">${s.title}</h2><p>${s.sub}</p><p>${s.description}</p><button class="secondary" id="saveDetail" aria-pressed="${saved.includes(id)}">${saved.includes(id) ? '✓ In my list' : '＋ Add to my list'}</button></div></div><div class="episodes"><div class="preview-notice"><span class="status">FREE PREVIEWS · COMING SOON</span><p>No preview or video episode is available yet. Explore the planned episode guide below.</p></div><div class="section-head"><h2>Season 1</h2><span class="count">EPISODE GUIDE</span></div><p class="notice">In development · Proposed episode outlines. Video episodes are coming soon.</p>${s.eps.map((e, i) => `<div class="episode"><span class="number">0${i + 1}</span><div class="eptext"><h3>${e[0]}</h3><p>${e[1]}</p></div><span class="status">COMING SOON</span></div>`).join('')}<p class="notice">${s.id === 'chance' ? 'Based on the hospital story and character artwork developed for this series.' : 'Working title and episode outlines developed from the original series concept.'}</p><div class="premium-handoff"><div><h3>The story continues in the app.</h3><p>Premium episodes will be unlocked in the BONC app. App and episodes coming soon.</p></div><button class="primary" id="unlockApp">Unlock in app <span aria-hidden="true">↗</span></button></div></div>`;
+  const detailArt = id === 'chance' ? approvedFor('first-series-detail')[0] : null;
+  const previews = id === 'chance' ? approvedFor('preview-gallery').slice(0, 4) : [];
+  const gallery = previews.length ? `<section class="approved-previews" aria-labelledby="approvedPreviewTitle"><div class="eyebrow">Behind the scenes</div><h2 id="approvedPreviewTitle">Approved frame previews</h2><p>Production-approved Episode 01 frames — not released episodes.</p><div class="preview-grid">${previews.map(asset => `<figure>${picture(asset, 'preview-art')}<figcaption><strong>${asset.label}</strong>${asset.caption}</figcaption></figure>`).join('')}</div></section>` : '';
+  $('detail').innerHTML = `<div class="detail-top">${detailArt ? picture(detailArt, 'detail-art') : '<div class="detail-art detail-art-pending" role="img" aria-label="Approved character artwork pending web export"></div>'}<div class="detail-copy"><div class="eyebrow">Bonc original · ${s.genre}</div><h2 id="detailTitle">${s.title}</h2><p>${s.sub}</p><p>${s.description}</p><button class="secondary" id="saveDetail" aria-pressed="${saved.includes(id)}">${saved.includes(id) ? '✓ In my list' : '＋ Add to my list'}</button></div></div>${gallery}<div class="episodes"><div class="preview-notice"><span class="status">FREE PREVIEWS · COMING SOON</span><p>No preview or video episode is available yet. Explore the planned episode guide below.</p></div><div class="section-head"><h2>Season 1</h2><span class="count">EPISODE GUIDE</span></div><p class="notice">In development · Proposed episode outlines. Video episodes are coming soon.</p>${s.eps.map((e, i) => `<div class="episode"><span class="number">0${i + 1}</span><div class="eptext"><h3>${e[0]}</h3><p>${e[1]}</p></div><span class="status">COMING SOON</span></div>`).join('')}<p class="notice">${s.id === 'chance' ? 'Based on the hospital story and character artwork developed for this series.' : 'Working title and episode outlines developed from the original series concept.'}</p><div class="premium-handoff"><div><h3>The story continues in the app.</h3><p>Premium episodes will be unlocked in the BONC app. App and episodes coming soon.</p></div><button class="primary" id="unlockApp">Unlock in app <span aria-hidden="true">↗</span></button></div></div>`;
   setHidden($('overlay'), false);
   $('overlay').scrollTop = 0;
   syncModalState();
