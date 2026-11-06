@@ -1,7 +1,24 @@
-export const stories=[
-{id:'chance',title:'A Second Chance',poster:'A Second\nChance',genre:'Drama',image:null,sub:'One small act changes everything.',description:'Michael, age 64 in 2026, sits outside a hospital at dusk. He needs an operation, yet gently refuses the money offered to him. A boy’s gift of food and water begins a story about dignity, compassion, and being seen.',eps:[['The Refusal','Outside the hospital at dusk, an offered banknote meets a gentle shake of the head.'],['A Boy’s Kindness','A sandwich, a bottle of water, and a moment of connection.'],['Through the Doors','A compassionate nurse listens to the man behind the worn brown coat.'],['The Waiting Room','As he waits for help, the people around him begin to see his story.'],['A Second Chance','An act of kindness opens the possibility of a different tomorrow.']]},
-{id:'talent',title:'New Talent',poster:'New\nTalent',genre:'Sports',image:'assets/story-0.jpg',sub:'Every legend starts somewhere.',description:'A young footballer with an extraordinary gift dreams of the biggest stage. A football coming-of-age drama about ambition, setbacks, and the people who believe before the world does.',eps:[['The First Touch','A young player’s love of the game begins far from the spotlight.'],['The Trial','An opportunity asks him to put his dream on the line.'],['On the Sidelines','A setback challenges his confidence.'],['One More Match','He returns to the pitch with something to prove to himself.'],['New Talent','A chance to be seen becomes a new beginning.']]},
-{id:'aid',title:'Aid: A Light Within',poster:'A Light\nWithin',genre:'Family',image:'assets/story-1.jpg',sub:'Love lives in the little moments.',description:'A family drama about a boy living with leukodystrophy, and the love that surrounds him. A gentle story centered on Aid as a person: his relationships, everyday joys, and the moments his family shares.',eps:[['Our Everyday','Meet Aid through the ordinary moments that make his world his own.'],['Beside You','His family navigates a changing routine together.'],['Little Joys','A small shared moment becomes the heart of the day.'],['Holding On','The family makes room for difficult feelings and connection.'],['A Light Within','They find meaning in being present with one another.']]},
-{id:'world',title:'Her Own World',poster:'Her Own\nWorld',genre:'Coming of age',image:'assets/story-2.jpg',sub:'Belonging begins with understanding.',description:'A coming-of-age drama centered on an autistic girl, her perspective, and the people learning to meet her with understanding. A story about friendship, identity, and making space for different ways of experiencing life.',eps:[['Through Her Eyes','A day unfolds from her perspective.'],['A New Place','An unfamiliar setting brings both curiosity and challenges.'],['Finding a Rhythm','She finds comfort in doing things her own way.'],['A Friend Who Listens','A friendship grows through patience and shared interests.'],['Room to Be Me','Belonging means being accepted as herself.']]},
-{id:'friends',title:'The Third Friend',poster:'The Third\nFriend',genre:'Coming of age',image:'assets/story-3.jpg',sub:'Three friends. One left outside.',description:'Three friends, aged fourteen, thirteen, and fourteen. When one begins to feel left out, the small silences between them grow. A teenage drama about loyalty, exclusion, and the courage to say what hurts.',eps:[['The Three of Us','For three friends, being together has always felt simple.'],['The Empty Seat','A small moment leaves one of them on the outside.'],['Left on Read','Unanswered messages make the distance feel bigger.'],['What We Didn’t Say','The friends finally face the feelings they have avoided.'],['A Place for Three','They must decide what their friendship means now.']]}
+export const PRIMARY_SERIES_ID = 'man-who-refused-a-dollar';
+
+export const stories = [
+  {
+    id: PRIMARY_SERIES_ID, aliases: ['chance'], catalogTitles: ['The Man Who Refused a Dollar', 'A Second Chance'],
+    title: 'The Man Who Refused a Dollar', poster: 'The Man Who\nRefused a Dollar', genre: 'Drama', image: null,
+    sub: 'One refusal. A story twelve years in the making.',
+    description: 'In 2026, 64-year-old Michael Carter refuses a dollar from Emma Brooks. Their encounter reaches back to Brooklyn in 2014, when Michael was 52, in a short drama about dignity, memory, and human connection.',
+    episodeCount: 10, episodeDuration: 'About 2 min',
+    eps: Array.from({ length: 10 }, (_, index) => [`Episode ${index + 1}`, index === 0 ? 'Michael Carter and Emma Brooks meet after an offered dollar is refused.' : 'Story details will be shared after the episode is approved for release.'])
+  },
+  { id: 'talent', title: 'New Talent', poster: 'New\nTalent', genre: 'Sports', image: 'assets/story-0.jpg', sub: 'Every legend starts somewhere.', description: 'A proposed football coming-of-age series. Story details are still in development.', episodeCount: 5, eps: [] },
+  { id: 'aid', title: 'Aid: A Light Within', poster: 'A Light\nWithin', genre: 'Family', image: 'assets/story-1.jpg', sub: 'Love lives in the little moments.', description: 'A proposed family drama. Story details are still in development.', episodeCount: 5, eps: [] },
+  { id: 'world', title: 'Her Own World', poster: 'Her Own\nWorld', genre: 'Coming of age', image: 'assets/story-2.jpg', sub: 'Belonging begins with understanding.', description: 'A proposed coming-of-age drama. Story details are still in development.', episodeCount: 5, eps: [] },
+  { id: 'friends', title: 'The Third Friend', poster: 'The Third\nFriend', genre: 'Coming of age', image: 'assets/story-3.jpg', sub: 'Three friends. One left outside.', description: 'A proposed coming-of-age drama about friendship. Story details are still in development.', episodeCount: 5, eps: [] }
 ];
+
+export function resolveStoryId(value) {
+  return stories.find(story => story.id === value || story.aliases?.includes(value))?.id || null;
+}
+
+export function migrateStoryIds(values = []) {
+  return [...new Set(values.map(resolveStoryId).filter(Boolean))];
+}
