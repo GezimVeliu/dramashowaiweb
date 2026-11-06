@@ -3,9 +3,12 @@ import { appConfig, detectPlatform, getAppDestinations } from './app-config.mjs'
 import { addFavorite, findSeriesByTitle, loadLibrary, removeFavorite } from './account/account-data.mjs';
 import { avatarProfile } from './account/account-ui.mjs';
 import { getUser, refreshSession, signOut } from './auth/auth-flow.mjs';
+import { assetManifest } from './asset-manifest.js';
 
 const $ = id => document.getElementById(id);
 const cats = ['All stories', 'Drama', 'Family', 'Coming of age', 'Sports'];
+// Keep the collection editorially led while BONC-61 finalizes the first-series copy.
+const collectionStories = [...stories.slice(1), stories[0]];
 let saved;
 try {
   saved = JSON.parse(localStorage.getItem('bonc-list') || '[]');
@@ -21,6 +24,8 @@ if (requestedSeries && new URLSearchParams(location.search).get('series') !== re
 }
 let accountSession = null, remoteSeries = new Map();
 let detailFocus, appFocus, toastTimer;
+const approvedFor = use => assetManifest.assets.filter(asset => asset.use.includes(use));
+const picture = (asset, className) => `<picture><source type="image/avif" srcset="${asset.srcset.avif}"><source type="image/webp" srcset="${asset.srcset.webp}"><img class="${className}" src="${asset.fallback}" srcset="${asset.srcset.fallback}" sizes="${asset.sizes}" alt="${asset.alt}" loading="lazy" width="${asset.width}" height="${asset.height}"></picture>`;
 let appContent = null;
 try {
   const previous = JSON.parse(sessionStorage.getItem('bonc-app-content') || 'null');
@@ -49,7 +54,7 @@ function showToast(message) {
 $('filters').innerHTML = cats.map(c => `<button class="filter" data-filter="${c}" aria-pressed="false">${c}</button>`).join('');
 function render() {
   const query = $('query').value.toLowerCase();
-  const shown = stories.filter(s => (filter === 'All stories' || s.genre === filter)
+  const shown = collectionStories.filter(s => (filter === 'All stories' || s.genre === filter)
     && (!listOnly || saved.includes(s.id))
     && (s.title + ' ' + s.description).toLowerCase().includes(query));
   $('grid').innerHTML = shown.map(s => `<button class="card" data-id="${s.id}" aria-label="Explore ${s.title}"><div class="poster ${s.image ? '' : 'poster-pending'}">${s.image ? `<img src="${s.image}" alt="Atmospheric concept artwork for ${s.title}" loading="lazy">` : '<span class="art-pending">CHARACTER ART AWAITING APPROVAL</span>'}<span class="tag">IN DEVELOPMENT</span><div class="poster-title"><small>BONC ORIGINAL</small>${s.poster.replace('\n', '<br>')}</div></div><h3>${s.title}</h3><p>${s.genre} · ${s.episodeCount} planned episodes ${saved.includes(s.id) ? '· Saved' : ''}</p></button>`).join('')
@@ -62,10 +67,7 @@ function render() {
     b.classList.toggle('on', active);
     b.setAttribute('aria-pressed', String(active));
   });
-  document.querySelectorAll('.poster img').forEach(img => img.onerror = () => {
-    img.style.opacity = '0';
-    img.parentElement.style.background = 'linear-gradient(145deg,#46533b,#192419 65%,#686344)';
-  });
+  document.querySelectorAll('.poster img').forEach(img => img.onerror = () => img.parentElement.classList.add('image-error'));
 }
 async function save(id) {
   const wasSaved = saved.includes(id);
