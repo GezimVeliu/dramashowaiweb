@@ -7,6 +7,8 @@ import { assetManifest } from './asset-manifest.js';
 
 const $ = id => document.getElementById(id);
 const cats = ['All stories', 'Drama', 'Family', 'Coming of age', 'Sports'];
+// Keep the collection editorially led while BONC-61 finalizes the first-series copy.
+const collectionStories = [...stories.slice(1), stories[0]];
 let saved;
 try {
   saved = JSON.parse(localStorage.getItem('bonc-list') || '[]');
@@ -44,23 +46,18 @@ function showToast(message) {
 $('filters').innerHTML = cats.map(c => `<button class="filter" data-filter="${c}" aria-pressed="false">${c}</button>`).join('');
 function render() {
   const query = $('query').value.toLowerCase();
-  const shown = stories.filter(s => (filter === 'All stories' || s.genre === filter)
+  const shown = collectionStories.filter(s => (filter === 'All stories' || s.genre === filter)
     && (!listOnly || saved.includes(s.id))
     && (s.title + ' ' + s.description).toLowerCase().includes(query));
-  $('grid').innerHTML = shown.map(s => `<button class="card" data-id="${s.id}" aria-label="Explore ${s.title}"><div class="poster">${s.image ? `<img src="${s.image}" alt="Atmospheric concept artwork for ${s.title}" loading="lazy">` : ''}<span class="tag">IN DEVELOPMENT</span><div class="poster-title"><small>BONC ORIGINAL</small>${s.poster.replace('\n', '<br>')}</div></div><h3>${s.title}</h3><p>${s.genre} · 5 planned episodes ${saved.includes(s.id) ? '· Saved' : ''}</p></button>`).join('')
+  $('grid').innerHTML = shown.map((s, index) => `<button class="card" data-id="${s.id}" aria-label="Explore ${s.title}"><div class="poster"><img src="${s.image}" alt="${s.id === 'chance' ? 'The elderly man outside the hospital at dusk' : 'Atmospheric concept artwork for ' + s.title}" loading="${index === 0 ? 'eager' : 'lazy'}"${index === 0 ? ' fetchpriority="high"' : ''}><span class="tag">IN DEVELOPMENT</span><div class="poster-title"><small>BONC ORIGINAL</small>${s.poster.replace('\n', '<br>')}</div></div><div class="card-info"><div><h3>${s.title}</h3><p>${s.genre} · 5 planned episodes${saved.includes(s.id) ? ' · Saved' : ''}</p></div><span class="card-status">View series →</span></div></button>`).join('')
     || `<p class="empty">${listOnly ? 'Your list is waiting for its first story. Explore a series and save it here.' : 'No stories found. Try another title or genre.'}</p>`;
-  $('heroSave').textContent = saved.includes('chance') ? '✓ Saved' : '＋ My list';
-  $('heroSave').setAttribute('aria-pressed', String(saved.includes('chance')));
   $('collectionTitle').textContent = listOnly ? 'Your stories, kept close.' : 'Stories that stay with you.';
   document.querySelectorAll('.filter').forEach(b => {
     const active = b.dataset.filter === filter;
     b.classList.toggle('on', active);
     b.setAttribute('aria-pressed', String(active));
   });
-  document.querySelectorAll('.poster img').forEach(img => img.onerror = () => {
-    img.style.opacity = '0';
-    img.parentElement.style.background = 'linear-gradient(145deg,#46533b,#192419 65%,#686344)';
-  });
+  document.querySelectorAll('.poster img').forEach(img => img.onerror = () => img.parentElement.classList.add('image-error'));
 }
 async function save(id) {
   const wasSaved = saved.includes(id);
@@ -217,9 +214,7 @@ function setCollection(onlySaved) {
 }
 $('grid').onclick = e => { const c = e.target.closest('[data-id]'); if (c) openSeries(c.dataset.id, c); };
 $('filters').onclick = e => { if (e.target.dataset.filter) { filter = e.target.dataset.filter; render(); } };
-$('explore').onclick = e => openSeries('chance', e.currentTarget);
-$('heroSave').onclick = () => save('chance');
-$('heroApp').onclick = e => openApp({ series: 'chance' }, e.currentTarget);
+$('heroApp').onclick = e => openApp(null, e.currentTarget);
 $('headerApp').onclick = e => openApp(appContent, e.currentTarget);
 $('bannerApp').onclick = e => openApp(appContent, e.currentTarget);
 $('close').onclick = closeSeries;
