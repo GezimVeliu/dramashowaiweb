@@ -10,7 +10,7 @@ test('validates account inputs without sending a request', () => {
 });
 test('signup and resend use only the fixed confirmation destination', async () => {
   const mock = capture(); await signUp('viewer@example.com', 'password1', mock.request); await resendSignup('viewer@example.com', mock.request);
-  for (const call of mock.calls) { assert.match(call.url, /redirect_to=https%3A%2F%2Fweb\.dramashowai\.workers\.dev%2Fauth%2Fconfirm%2F/); assert.doesNotMatch(call.url, /localhost/); }
+  for (const call of mock.calls) { assert.match(call.url, /redirect_to=https%3A%2F%2Fdramashow\.gezimveliu\.com%2Fauth%2Fconfirm%2F/); assert.doesNotMatch(call.url, /localhost/); }
   assert.deepEqual(JSON.parse(mock.calls[1].options.body), { email: 'viewer@example.com', type: 'signup' });
 });
 test('code verification consumes a signup OTP and sign-in uses the password grant', async () => {
