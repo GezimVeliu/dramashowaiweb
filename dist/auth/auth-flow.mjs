@@ -1,7 +1,7 @@
 export const apiUrl = 'https://xbkfudvnewhescwbmrgt.supabase.co/auth/v1';
 export const apiKey = 'sb_publishable_Qt4aAXF6GepS-reTaFvzmQ_0CwElQK1';
-export const confirmationUrl = 'https://web.dramashowai.workers.dev/auth/confirm/';
-export const recoveryUrl = 'https://web.dramashowai.workers.dev/auth/';
+export const confirmationUrl = 'https://dramashow.gezimveliu.com/auth/confirm/';
+export const recoveryUrl = 'https://dramashow.gezimveliu.com/auth/';
 
 const headers = token => ({ apikey: apiKey, 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) });
 async function authRequest(path, body, request = fetch, token, method = 'POST') {
