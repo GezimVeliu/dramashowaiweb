@@ -1,23 +1,36 @@
-import { stories } from './stories.js';
+import { migrateStoryIds, PRIMARY_SERIES_ID, resolveStoryId, stories } from './stories.js';
 import { appConfig, detectPlatform, getAppDestinations } from './app-config.mjs';
 import { addFavorite, findSeriesByTitle, loadLibrary, removeFavorite } from './account/account-data.mjs';
 import { avatarProfile } from './account/account-ui.mjs';
 import { getUser, refreshSession, signOut } from './auth/auth-flow.mjs';
+import { assetManifest } from './asset-manifest.js';
 
 const $ = id => document.getElementById(id);
 const cats = ['All stories', 'Drama', 'Family', 'Coming of age', 'Sports'];
+// Keep the collection editorially led while BONC-61 finalizes the first-series copy.
+const collectionStories = [...stories.slice(1), stories[0]];
 let saved;
 try {
   saved = JSON.parse(localStorage.getItem('bonc-list') || '[]');
   if (!Array.isArray(saved)) saved = [];
+  saved = migrateStoryIds(saved);
 } catch { saved = []; }
 let filter = 'All stories', listOnly = false, current = null;
+const requestedSeries = resolveStoryId(new URLSearchParams(location.search).get('series'));
+if (requestedSeries && new URLSearchParams(location.search).get('series') !== requestedSeries) {
+  const canonicalUrl = new URL(location.href);
+  canonicalUrl.searchParams.set('series', requestedSeries);
+  history.replaceState(null, '', canonicalUrl);
+}
 let accountSession = null, remoteSeries = new Map();
 let detailFocus, appFocus, toastTimer;
+const approvedFor = use => assetManifest.assets.filter(asset => asset.use.includes(use));
+const picture = (asset, className) => `<picture><source type="image/avif" srcset="${asset.srcset.avif}"><source type="image/webp" srcset="${asset.srcset.webp}"><img class="${className}" src="${asset.fallback}" srcset="${asset.srcset.fallback}" sizes="${asset.sizes}" alt="${asset.alt}" loading="lazy" width="${asset.width}" height="${asset.height}"></picture>`;
 let appContent = null;
 try {
   const previous = JSON.parse(sessionStorage.getItem('bonc-app-content') || 'null');
-  if (stories.some(s => s.id === previous?.series)) appContent = { series: previous.series };
+  const sessionSeries = resolveStoryId(previous?.series);
+  if (sessionSeries) appContent = { series: sessionSeries };
 } catch { /* Session storage is optional. */ }
 
 function setHidden(element, hidden) {
@@ -41,23 +54,20 @@ function showToast(message) {
 $('filters').innerHTML = cats.map(c => `<button class="filter" data-filter="${c}" aria-pressed="false">${c}</button>`).join('');
 function render() {
   const query = $('query').value.toLowerCase();
-  const shown = stories.filter(s => (filter === 'All stories' || s.genre === filter)
+  const shown = collectionStories.filter(s => (filter === 'All stories' || s.genre === filter)
     && (!listOnly || saved.includes(s.id))
     && (s.title + ' ' + s.description).toLowerCase().includes(query));
-  $('grid').innerHTML = shown.map(s => `<button class="card" data-id="${s.id}" aria-label="Explore ${s.title}"><div class="poster"><img src="${s.image}" alt="${s.id === 'chance' ? 'The elderly man outside the hospital at dusk' : 'Atmospheric concept artwork for ' + s.title}" loading="lazy"><span class="tag">IN DEVELOPMENT</span><div class="poster-title"><small>BONC ORIGINAL</small>${s.poster.replace('\n', '<br>')}</div></div><h3>${s.title}</h3><p>${s.genre} · 5 planned episodes ${saved.includes(s.id) ? '· Saved' : ''}</p></button>`).join('')
+  $('grid').innerHTML = shown.map(s => `<button class="card" data-id="${s.id}" aria-label="Explore ${s.title}"><div class="poster ${s.image ? '' : 'poster-pending'}">${s.image ? `<img src="${s.image}" alt="Atmospheric concept artwork for ${s.title}" loading="lazy">` : '<span class="art-pending">CHARACTER ART AWAITING APPROVAL</span>'}<span class="tag">IN DEVELOPMENT</span><div class="poster-title"><small>BONC ORIGINAL</small>${s.poster.replace('\n', '<br>')}</div></div><h3>${s.title}</h3><p>${s.genre} · ${s.episodeCount} planned episodes ${saved.includes(s.id) ? '· Saved' : ''}</p></button>`).join('')
     || `<p class="empty">${listOnly ? 'Your list is waiting for its first story. Explore a series and save it here.' : 'No stories found. Try another title or genre.'}</p>`;
-  $('heroSave').textContent = saved.includes('chance') ? '✓ Saved' : '＋ My list';
-  $('heroSave').setAttribute('aria-pressed', String(saved.includes('chance')));
+  $('heroSave').textContent = saved.includes(PRIMARY_SERIES_ID) ? '✓ Saved' : '＋ My list';
+  $('heroSave').setAttribute('aria-pressed', String(saved.includes(PRIMARY_SERIES_ID)));
   $('collectionTitle').textContent = listOnly ? 'Your stories, kept close.' : 'Stories that stay with you.';
   document.querySelectorAll('.filter').forEach(b => {
     const active = b.dataset.filter === filter;
     b.classList.toggle('on', active);
     b.setAttribute('aria-pressed', String(active));
   });
-  document.querySelectorAll('.poster img').forEach(img => img.onerror = () => {
-    img.style.opacity = '0';
-    img.parentElement.style.background = 'linear-gradient(145deg,#46533b,#192419 65%,#686344)';
-  });
+  document.querySelectorAll('.poster img').forEach(img => img.onerror = () => img.parentElement.classList.add('image-error'));
 }
 async function save(id) {
   const wasSaved = saved.includes(id);
@@ -74,7 +84,14 @@ async function save(id) {
   if (accountSession) {
     try {
       let catalog = remoteSeries.get(id);
-      if (!catalog) { catalog = await findSeriesByTitle(accountSession.access_token, stories.find(s => s.id === id)?.title); if (catalog) remoteSeries.set(id, catalog); }
+      if (!catalog) {
+        const story = stories.find(s => s.id === id);
+        for (const title of story?.catalogTitles || [story?.title]) {
+          catalog = await findSeriesByTitle(accountSession.access_token, title);
+          if (catalog) break;
+        }
+        if (catalog) remoteSeries.set(id, catalog);
+      }
       if (!catalog) throw new Error('This story is not in the app catalog yet.');
       if (wasSaved) await removeFavorite(accountSession.access_token, catalog.id); else await addFavorite(accountSession.access_token, catalog.id);
     } catch (error) {
@@ -95,7 +112,7 @@ async function connectAccount() {
     const library = await loadLibrary(accountSession.access_token);
     const synced = [];
     for (const favorite of library.favorites) {
-      const story = stories.find(item => item.title === favorite.series.title);
+      const story = stories.find(item => item.title === favorite.series.title || item.catalogTitles?.includes(favorite.series.title));
       if (story) { synced.push(story.id); remoteSeries.set(story.id, favorite.series); }
     }
     saved = synced; localStorage.setItem('bonc-list', JSON.stringify(saved)); render();
@@ -128,6 +145,7 @@ $('headerLogout').onclick = async () => {
 document.addEventListener('click', event => { if (!event.target.closest('.account-control')) closeAccountMenu(); });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('accountMenu').classList.contains('hidden')) { closeAccountMenu(); $('avatarButton').focus(); } });
 function openSeries(id, trigger = document.activeElement) {
+  id = resolveStoryId(id);
   const s = stories.find(x => x.id === id);
   if (!s) return;
   current = id;
@@ -151,13 +169,14 @@ function closeSeries() {
 }
 function openApp(content = appContent, trigger = document.activeElement) {
   appFocus = trigger;
-  appContent = content && stories.some(s => s.id === content.series) ? { series: content.series } : null;
+  const contentSeries = resolveStoryId(content?.series);
+  appContent = contentSeries ? { series: contentSeries } : null;
   try { sessionStorage.setItem('bonc-app-content', JSON.stringify(appContent)); } catch { /* Optional. */ }
   const s = stories.find(s => s.id === appContent?.series);
   $('appSelection').replaceChildren();
   if (s) {
     const image = document.createElement('img');
-    image.src = s.image;
+    image.src = s.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22/%3E';
     image.alt = '';
     const copy = document.createElement('div');
     const label = document.createElement('span');
@@ -211,9 +230,9 @@ function setCollection(onlySaved) {
 }
 $('grid').onclick = e => { const c = e.target.closest('[data-id]'); if (c) openSeries(c.dataset.id, c); };
 $('filters').onclick = e => { if (e.target.dataset.filter) { filter = e.target.dataset.filter; render(); } };
-$('explore').onclick = e => openSeries('chance', e.currentTarget);
-$('heroSave').onclick = () => save('chance');
-$('heroApp').onclick = e => openApp({ series: 'chance' }, e.currentTarget);
+$('explore').onclick = e => openSeries(PRIMARY_SERIES_ID, e.currentTarget);
+$('heroSave').onclick = () => save(PRIMARY_SERIES_ID);
+$('heroApp').onclick = e => openApp({ series: PRIMARY_SERIES_ID }, e.currentTarget);
 $('headerApp').onclick = e => openApp(appContent, e.currentTarget);
 $('bannerApp').onclick = e => openApp(appContent, e.currentTarget);
 $('close').onclick = closeSeries;
@@ -241,4 +260,5 @@ $('searchBtn').onclick = () => {
 $('query').oninput = render;
 $('studioBtn').onclick = () => { setCollection(false); filter = 'All stories'; render(); $('series').scrollIntoView({ behavior: 'smooth' }); };
 render();
+if (requestedSeries) openSeries(requestedSeries, $('explore'));
 connectAccount();
