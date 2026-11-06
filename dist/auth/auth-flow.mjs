@@ -36,3 +36,12 @@ export async function getUser(accessToken, request = fetch) {
   if (!response.ok) throw new Error('Your session has expired. Sign in again.');
   return response.json();
 }
+
+// Fixed-origin OAuth redirect. Never accept arbitrary return destinations from query parameters.
+export const oauthReturnUrl = 'https://dramashow.gezimveliu.com/auth/';
+export function googleOAuthUrl() {
+  const url = new URL(`${apiUrl}/authorize`);
+  url.searchParams.set('provider', 'google');
+  url.searchParams.set('redirect_to', oauthReturnUrl);
+  return url.href;
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readCallback, requestRecovery, resendSignup, signIn, signOut, signUp, updatePassword, validateEmail, validatePassword, verifySignupCode } from '../dist/auth/auth-flow.mjs';
+import { googleOAuthUrl, oauthReturnUrl, readCallback, requestRecovery, resendSignup, signIn, signOut, signUp, updatePassword, validateEmail, validatePassword, verifySignupCode } from '../dist/auth/auth-flow.mjs';
 
 const response = (payload = {}, ok = true, status = 200) => ({ ok, status, json: async () => payload });
 const capture = (payload = {}) => { const calls = []; return { calls, request: async (url, options) => { calls.push({ url, options }); return response(payload); } }; };
@@ -29,4 +29,18 @@ test('callback parser accepts complete sessions, distinguishes recovery, and rej
 test('auth failures expose safe API feedback and rate-limit guidance', async () => {
   await assert.rejects(signIn('viewer@example.com', 'password1', async () => response({ message: 'Invalid login credentials' }, false, 400)), /Invalid login credentials/);
   await assert.rejects(signIn('viewer@example.com', 'password1', async () => response({}, false, 429)), /Too many attempts/);
+});
+
+test('Google OAuth starts with fixed Supabase authorize endpoint and cannot open arbitrary callback destinations', () => {
+  const url = new URL(googleOAuthUrl());
+  assert.equal(url.origin, 'https://xbkfudvnewhescwbmrgt.supabase.co');
+  assert.equal(url.pathname, '/auth/v1/authorize');
+  assert.equal(url.searchParams.get('provider'), 'google');
+  assert.equal(url.searchParams.get('redirect_to'), oauthReturnUrl);
+  assert.equal(oauthReturnUrl, 'https://dramashow.gezimveliu.com/auth/');
+  assert.equal(url.searchParams.has('client_secret'), false);
+});
+test('OAuth success and rejection preserve the existing secure callback parser', () => {
+  assert.deepEqual(readCallback('#access_token=google-access&refresh_token=google-refresh&provider_token=ignored'), {kind:'session',access_token:'google-access',refresh_token:'google-refresh'});
+  assert.deepEqual(readCallback('#error=access_denied&error_description=cancelled'), {kind:'error'});
 });

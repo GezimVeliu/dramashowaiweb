@@ -1,4 +1,4 @@
-import { getUser, readCallback, refreshSession, requestRecovery, resendSignup, signIn, signOut, signUp, updatePassword, validateEmail, validatePassword, verifySignupCode } from './auth-flow.mjs';
+import { getUser, googleOAuthUrl, readCallback, refreshSession, requestRecovery, resendSignup, signIn, signOut, signUp, updatePassword, validateEmail, validatePassword, verifySignupCode } from './auth-flow.mjs';
 const $ = id => document.getElementById(id);
 const storageKey = 'bonc-auth-session';
 let mode = 'signup', pendingEmail = '', session = null;
@@ -13,10 +13,11 @@ function setMode(next) {
   $('lead').textContent = signup ? 'We’ll email a one-time link and code to confirm it’s you.' : 'Sign in with your confirmed email and password.';
   $('submit').textContent = signup ? 'Create account' : 'Sign in'; $('password').autocomplete = signup ? 'new-password' : 'current-password'; $('verify').hidden = true; setStatus();
 }
-async function acceptSession(next) { store(next); const user = await getUser(next.access_token); showAccount(user); }
+async function acceptSession(next) { const user = await getUser(next.access_token); store(next); showAccount(user); }
 const callback = readCallback(location.hash);
-if (location.hash) history.replaceState(null, '', location.pathname);
-if (callback?.kind === 'error') setStatus('This link is invalid or expired. Request a new email.');
+const oauthError = new URLSearchParams(location.search).has('error') || new URLSearchParams(location.search).has('error_code');
+if (location.hash || oauthError) history.replaceState(null, '', location.pathname);
+if (oauthError || callback?.kind === 'error') setStatus('This link is invalid or expired. Request a new email.');
 else if (callback?.kind === 'recovery') { session = callback; $('signedOut').hidden = true; $('recovery').hidden = false; setStatus('Recovery link accepted.', true); }
 else if (callback?.kind === 'session') acceptSession(callback).catch(error => setStatus(error.message));
 else {
@@ -39,3 +40,10 @@ $('resend').onclick = async () => { if (!pendingEmail) return; busy($('resend'),
 $('forgot').onclick = async () => { const email = $('email').value.trim().toLowerCase(); if (!validateEmail(email)) return setStatus('Enter your email address first.'); busy($('forgot'), true); try { await requestRecovery(email); setStatus('If an account exists, a recovery email is on its way.', true); } catch (error) { setStatus(error.message); } finally { busy($('forgot'), false); } };
 $('savePassword').onclick = async () => { const password = $('newPassword').value; if (!validatePassword(password)) return setStatus('Use a password between 8 and 72 characters.'); busy($('savePassword'), true); try { await updatePassword(session.access_token, password); await acceptSession(session); setStatus('Your password was updated.', true); } catch (error) { setStatus(error.message); } finally { busy($('savePassword'), false); } };
 $('logout').onclick = async () => { busy($('logout'), true); try { await signOut(session.access_token); } catch { /* Clear expired local sessions too. */ } store(null); location.reload(); };
+
+$('googleSignin').onclick = () => {
+  $('googleSignin').disabled = true;
+  setStatus('Opening secure Google sign-in…');
+  // Browser navigates to Supabase Auth, then to Google, then back to this fixed page.
+  location.assign(googleOAuthUrl());
+};
