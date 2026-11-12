@@ -23,3 +23,11 @@ test('account nav remains hidden by default',()=>{
  assert.match(s,/id="studioNav"[^>]+hidden/);
  assert.match(file('dist/account/account.mjs'),/isStudioAdmin/);
 });
+
+test('public home account menu grants no studio link without server-checked admin role',()=>{
+ const home=file('dist/index.html');
+ assert.match(home,/id="studioMenuItem"[^>]+hidden/);
+ const js=file('dist/app.js');
+ assert.match(js,/isStudioAdmin\(accountSession.access_token,user.id\)/);
+ assert.match(js,/studioMenuItem/);
+});
