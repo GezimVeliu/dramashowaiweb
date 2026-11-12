@@ -1,5 +1,5 @@
 import { getUser, refreshSession, signOut } from '../auth/auth-flow.mjs';
-import { loadLibrary, removeFavorite } from './account-data.mjs';
+import { isStudioAdmin, loadLibrary, removeFavorite } from './account-data.mjs';
 import { appConfig, detectPlatform, getAppDestinations } from '../app-config.mjs';
 
 const $ = id => document.getElementById(id);
@@ -11,7 +11,7 @@ const store = value => value ? localStorage.setItem(storageKey, JSON.stringify(v
 const empty = message => `<div class="inline-empty"><p>${message}</p><a href="/">Discover BONC stories</a></div>`;
 const time = seconds => `${Math.max(1, Math.round(Number(seconds || 0) / 60))} min`;
 
-function showSignedOut(message = '') { $('status').textContent = message; $('signedOut').hidden = false; $('dashboard').hidden = true; $('logout').hidden = true; }
+function showSignedOut(message = '') { $('studioNav').hidden = true; $('status').textContent = message; $('signedOut').hidden = false; $('dashboard').hidden = true; $('logout').hidden = true; }
 function historyRow(item) {
   const label = item.isComplete ? 'Watched' : `${item.percent}% complete`;
   const number = item.episode.episode_number || item.episode.number || 1;
@@ -25,6 +25,7 @@ async function render() {
     catch { session = await refreshSession(session.refresh_token); store(session); user = await getUser(session.access_token); }
     $('identity').textContent = user.email ? `Signed in as ${user.email}. Your favorites and viewing activity sync with the BONC app.` : 'Your favorites and viewing activity sync with the BONC app.';
     const library = await loadLibrary(session.access_token);
+    try { $('studioNav').hidden = !(await isStudioAdmin(session.access_token,user.id)); } catch { $('studioNav').hidden = true; }
     $('favorites').innerHTML = library.favorites.map(item => `<article class="favorite"><div class="favorite-art">${item.series.poster_url ? `<img src="${escape(item.series.poster_url)}" alt="">` : '<span>✳</span>'}</div><div><p>BONC ORIGINAL</p><h3>${escape(item.series.title)}</h3><small>${escape(item.series.description || 'Saved to My List')}</small><button class="remove" data-remove="${escape(item.series.id)}">Remove from favorites</button></div></article>`).join('') || empty('Your favorites will appear here on every signed-in device.');
     $('continueWatching').innerHTML = library.continueWatching.map(historyRow).join('') || empty('Start an episode in the BONC app and continue it from any device.');
     $('watched').innerHTML = library.watched.map(historyRow).join('') || empty('Completed episodes will be kept here.');
