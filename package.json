@@ -3,7 +3,7 @@
   "private": true,
   "description": "Buildless BONC Stories static website. The deployable site is already in dist/.",
   "scripts": {
-    "check": "node --check dist/app.js && node --check dist/stories.js && node --check dist/app-config.mjs && node --check dist/pilot-funnel.mjs && node --check dist/auth/auth-flow.mjs && node --check dist/auth/auth.mjs && node --check dist/auth/confirm/confirm.mjs && node --check dist/account/account-data.mjs && node --check dist/account/account-ui.mjs && node --check dist/account/account.mjs && node --check dist/hero-motion.mjs",
+    "check": "node --check dist/app.js && node --check dist/stories.js && node --check dist/app-config.mjs && node --check dist/pilot-funnel.mjs && node --check dist/auth/auth-flow.mjs && node --check dist/auth/auth.mjs && node --check dist/auth/confirm/confirm.mjs && node --check dist/account/account-data.mjs && node --check dist/account/account-ui.mjs && node --check dist/account/account.mjs && node --check dist/hero-motion.mjs && node --check dist/studio/guard.mjs",
     "test": "node --test tests/*.test.mjs",
     "build": "npm run check",
     "ci": "npm run check && npm test"
