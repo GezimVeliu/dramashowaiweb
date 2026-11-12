@@ -1,6 +1,6 @@
 import { migrateStoryIds, PRIMARY_SERIES_ID, resolveStoryId, stories } from './stories.js';
 import { appConfig, detectPlatform, getAppDestinations } from './app-config.mjs';
-import { addFavorite, findSeriesByTitle, loadLibrary, removeFavorite } from './account/account-data.mjs';
+import { addFavorite, findSeriesByTitle, isStudioAdmin, loadLibrary, removeFavorite } from './account/account-data.mjs';
 import { avatarProfile } from './account/account-ui.mjs';
 import { getUser, refreshSession, signOut } from './auth/auth-flow.mjs';
 import { assetManifest } from './asset-manifest.js';
@@ -109,6 +109,7 @@ async function connectAccount() {
     try { user = await getUser(accountSession.access_token); }
     catch { accountSession = await refreshSession(accountSession.refresh_token); localStorage.setItem('bonc-auth-session', JSON.stringify(accountSession)); user = await getUser(accountSession.access_token); }
     showAccountControl(user);
+    isStudioAdmin(accountSession.access_token,user.id).then(allowed => { $('studioMenuItem').hidden = !allowed; $('studioMenuItem').classList.toggle('hidden',!allowed); }).catch(() => { $('studioMenuItem').hidden = true; $('studioMenuItem').classList.add('hidden'); });
     const library = await loadLibrary(accountSession.access_token);
     const synced = [];
     for (const favorite of library.favorites) {
@@ -137,7 +138,7 @@ $('headerLogout').onclick = async () => {
   $('headerLogout').disabled = true;
   try { await signOut(accountSession.access_token); } catch { /* Expired sessions are still removed locally. */ }
   localStorage.removeItem('bonc-auth-session');
-  accountSession = null; saved = [];
+  accountSession = null; saved = []; $('studioMenuItem').hidden = true; $('studioMenuItem').classList.add('hidden');
   try { localStorage.setItem('bonc-list', '[]'); } catch { /* Optional storage. */ }
   closeAccountMenu(); $('avatarButton').classList.add('hidden'); $('getStarted').classList.remove('hidden'); render();
   showToast('You are signed out on this device');
