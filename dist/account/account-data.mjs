@@ -63,3 +63,9 @@ export function addFavorite(token, seriesId, fetcher = fetch) {
 export function removeFavorite(token, seriesId, fetcher = fetch) {
   return request(`watchlist?series_id=eq.${encodeURIComponent(seriesId)}`, token, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, fetcher);
 }
+
+export async function isStudioAdmin(token,userId,fetcher=fetch){
+  if(!token||!userId)return false;
+  const rows=await request('profiles?select=is_admin&id=eq.'+encodeURIComponent(userId),token,{},fetcher);
+  return rows?.length===1&&rows[0].is_admin===true;
+}
