@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { separatePrivateDocument, resolveStudioSlug } from '../dist/studio/guard.mjs';
+import { separatePrivateDocument, resolveStudioSlug, approvedDriveSourceLink } from '../dist/studio/guard.mjs';
 
 const file = path => readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
@@ -45,4 +45,27 @@ test('navigation is hidden by default and shown only after server-checked admin 
   assert.match(file('dist/account/account.mjs'), /isStudioAdmin/);
   assert.match(file('dist/index.html'), /id="studioMenuItem"[^>]+hidden/);
   assert.match(file('dist/app.js'), /isStudioAdmin\(accountSession.access_token,user.id\)/);
+});
+
+test('private Drive image fallback only links to verified canonical Drive file URLs', () => {
+  const good = 'https://drive.google.com/file/d/1TSgBAH4C8bV2jOAu4M_oKqmYU__2Rggk/view?usp=drivesdk';
+  assert.equal(approvedDriveSourceLink(good),
+    'https://drive.google.com/file/d/1TSgBAH4C8bV2jOAu4M_oKqmYU__2Rggk/view');
+  for (const unsafe of [
+    'https://evil.example/file/d/abc/view',
+    'https://drive.google.com.evil.example/file/d/abc/view',
+    'javascript:alert(1)',
+    '/file/d/abc/view',
+    'https://drive.google.com/drive/folders/secret',
+    'http://drive.google.com/file/d/abc/view',
+  ]) {
+    assert.equal(approvedDriveSourceLink(unsafe), null, unsafe);
+  }
+});
+test('fallback does not publish private Drive bytes or bypass admin RLS', () => {
+  const code = file('dist/studio/guard.mjs');
+  assert.match(code, /document.addEventListener\('error', showStudioImageFallback, true\)/);
+  assert.match(code, /studio_pages\?select=content_html/);
+  assert.match(code, /rows\[0\]\.is_admin !== true/);
+  assert.doesNotMatch(code, /setFilePermissions|storage\.from|update\(.*is_admin/);
 });
