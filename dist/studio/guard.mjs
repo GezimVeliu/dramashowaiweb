@@ -35,12 +35,62 @@ async function readRows(path, token, request = fetch) {
   return rows;
 }
 
+// Private Google Drive thumbnails cannot normally render as <img> from the
+// Netlify origin. Do not weaken Drive sharing or RLS: show a clear source link.
+export function approvedDriveSourceLink(candidate) {
+  if (typeof candidate !== 'string') return null;
+  try {
+    const url = new URL(candidate);
+    const match = url.pathname.match(/^\/file\/d\/([a-zA-Z0-9_-]+)\/view\/?$/);
+    if (url.protocol !== 'https:' || url.hostname !== 'drive.google.com' || !match) {
+      return null;
+    }
+    return 'https://drive.google.com/file/d/' + match[1] + '/view';
+  } catch {
+    return null;
+  }
+}
+
+function showStudioImageFallback(event) {
+  const image = event.target;
+  if (!image || image.tagName !== 'IMG') return;
+  const anchor = image.closest('a[href]');
+  const source = approvedDriveSourceLink(anchor?.href);
+  const fallback = document.createElement('span');
+  fallback.setAttribute('role', 'note');
+  fallback.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-height:90px;padding:14px;border:1px dashed #64748b;border-radius:10px;justify-content:center;align-items:center;text-align:center;font:13px/1.5 system-ui;color:#cbd5e1;background:#141820';
+  const description = document.createElement('span');
+  description.textContent = image.alt
+    ? image.alt + ' — Preview unavailable'
+    : 'Image preview unavailable';
+  fallback.append(description);
+  if (source) {
+    const link = document.createElement('a');
+    link.href = source;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Open approved image in Google Drive';
+    link.style.color = '#f0c987';
+    fallback.append(link);
+  } else {
+    const note = document.createElement('span');
+    note.textContent = 'Source image could not be loaded. Please verify the original asset.';
+    fallback.append(note);
+  }
+  // An original <a><img /></a> must be replaced as one unit so the fallback
+  // never nests clickable links. It does not grant access to a private file.
+  const target = anchor && anchor.children.length === 1 && anchor.contains(image)
+    ? anchor : image;
+  target.replaceWith(fallback);
+}
+
 function renderPrivateDocument(html) {
   const { markup, javascript } = separatePrivateDocument(html);
   const objectUrl = URL.createObjectURL(new Blob([javascript], { type: 'text/javascript' }));
   document.open();
   document.write(markup);
   document.close();
+  document.addEventListener('error', showStudioImageFallback, true);
 
   // A dynamically appended external script executes reliably after document.write(),
   // unlike inline scripts inserted after the document's initial parse.
