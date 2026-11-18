@@ -1,6 +1,6 @@
-import { migrateStoryIds, PRIMARY_SERIES_ID, resolveStoryId, stories } from './stories.js';
+import { migrateStoryIds, PRIMARY_SERIES_ID, resolveStoryId, storyForCatalogSeries, stories } from './stories.js';
 import { appConfig, detectPlatform, getAppDestinations } from './app-config.mjs';
-import { addFavorite, findSeriesByTitle, isStudioAdmin, loadLibrary, removeFavorite } from './account/account-data.mjs';
+import { addFavorite, findSeriesBySlug, findSeriesByTitle, isStudioAdmin, loadLibrary, removeFavorite } from './account/account-data.mjs';
 import { avatarProfile } from './account/account-ui.mjs';
 import { getUser, refreshSession, signOut } from './auth/auth-flow.mjs';
 import { assetManifest } from './asset-manifest.js';
@@ -69,35 +69,76 @@ function render() {
   });
   document.querySelectorAll('.poster img').forEach(img => img.onerror = () => img.parentElement.classList.add('image-error'));
 }
+function updateDetailFavoriteButton() {
+  if (!current) return;
+  const button = $('saveDetail');
+  if (!button) return;
+  button.textContent = saved.includes(current) ? '✓ In my list' : '＋ Add to my list';
+  button.setAttribute('aria-pressed', String(saved.includes(current)));
+}
+
+function persistFavoritesLocally() {
+  try {
+    localStorage.setItem('bonc-list', JSON.stringify(saved));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function save(id) {
   const wasSaved = saved.includes(id);
-  saved = saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id];
-  let persisted = true;
-  try { localStorage.setItem('bonc-list', JSON.stringify(saved)); } catch { persisted = false; }
+  saved = wasSaved ? saved.filter(value => value !== id) : [...saved, id];
+  const persisted = persistFavoritesLocally();
   render();
-  if (current) {
-    $('saveDetail').textContent = saved.includes(current) ? '✓ In my list' : '＋ Add to my list';
-    $('saveDetail').setAttribute('aria-pressed', String(saved.includes(current)));
+  updateDetailFavoriteButton();
+
+  if (!accountSession) {
+    showToast((wasSaved ? 'Removed from your list' : 'Added to your list')
+      + (persisted ? ' · Sign in to sync' : ' · For this visit only'));
+    return;
   }
-  showToast((saved.includes(id) ? 'Added to your list' : 'Removed from your list')
-    + (accountSession ? ' · Synced with your account' : (persisted ? ' · Sign in to sync' : ' · For this visit only')));
-  if (accountSession) {
-    try {
-      let catalog = remoteSeries.get(id);
-      if (!catalog) {
-        const story = stories.find(s => s.id === id);
-        for (const title of story?.catalogTitles || [story?.title]) {
-          catalog = await findSeriesByTitle(accountSession.access_token, title);
-          if (catalog) break;
-        }
-        if (catalog) remoteSeries.set(id, catalog);
+
+  try {
+    let catalog = remoteSeries.get(id);
+    if (!catalog) {
+      const story = stories.find(item => item.id === id);
+      // Supabase's E01 is still titled "The Old Man"; editorially it is
+      // "The Man Who Refused a Dollar". Use verified slugs, not a title join.
+      for (const slug of story?.catalogSlugs || []) {
+        catalog = await findSeriesBySlug(accountSession.access_token, slug);
+        if (catalog) break;
       }
-      if (!catalog) throw new Error('This story is not in the app catalog yet.');
-      if (wasSaved) await removeFavorite(accountSession.access_token, catalog.id); else await addFavorite(accountSession.access_token, catalog.id);
-    } catch (error) {
-      saved = wasSaved ? [...saved, id] : saved.filter(value => value !== id); render();
-      showToast(`${error.message} Your local list was restored.`);
+      if (!catalog) {
+        // Exact-title fallback is for older catalog records only; never
+        // introduce speculative aliases for differently named concepts.
+        for (const title of story?.catalogTitles || [story?.title]) {
+          const candidate = await findSeriesByTitle(accountSession.access_token, title);
+          if (!candidate) continue;
+          // An exact historical title by itself is not proof of identity if
+          // the live catalog carries a *different* stable series slug.
+          // New concepts without catalogSlugs can still match a canonical
+          // title, but not a speculative legacy title.
+          if (candidate.slug && (story.catalogSlugs?.length || title !== story.title)) {
+            if (storyForCatalogSeries(candidate)?.id !== id) continue;
+          }
+          catalog = candidate;
+          break;
+        }
+      }
+      if (catalog) remoteSeries.set(id, catalog);
     }
+    if (!catalog) throw new Error('This story is not in the app catalog yet.');
+    if (wasSaved) await removeFavorite(accountSession.access_token, catalog.id);
+    else await addFavorite(accountSession.access_token, catalog.id);
+    showToast((wasSaved ? 'Removed from your list' : 'Added to your list') + ' · Synced with your account');
+  } catch (error) {
+    // Revert both on-screen state and local persistence if RLS/network/API fails.
+    saved = wasSaved ? [...saved, id] : saved.filter(value => value !== id);
+    persistFavoritesLocally();
+    render();
+    updateDetailFavoriteButton();
+    showToast(`${error?.message || 'Your list could not be synced.'} Your previous list was restored.`);
   }
 }
 
@@ -113,7 +154,7 @@ async function connectAccount() {
     const library = await loadLibrary(accountSession.access_token);
     const synced = [];
     for (const favorite of library.favorites) {
-      const story = stories.find(item => item.title === favorite.series.title || item.catalogTitles?.includes(favorite.series.title));
+      const story = storyForCatalogSeries(favorite.series);
       if (story) { synced.push(story.id); remoteSeries.set(story.id, favorite.series); }
     }
     saved = synced; localStorage.setItem('bonc-list', JSON.stringify(saved)); render();

@@ -37,7 +37,15 @@ export async function loadLibrary(token, fetcher = fetch) {
 }
 
 export async function findSeriesByTitle(token, title, fetcher = fetch) {
-  const rows = await request(`series?select=id,title&title=eq.${encodeURIComponent(title)}&limit=1`, token, {}, fetcher);
+  const rows = await request(`series?select=id,title,slug&title=eq.${encodeURIComponent(title)}&limit=1`, token, {}, fetcher);
+  return rows?.[0] || null;
+}
+
+// Preserve cross-device favorites when an editorial display title changes.
+// The catalog uses a stable slug; reject malformed slugs before REST filters.
+export async function findSeriesBySlug(token, slug, fetcher = fetch) {
+  if (typeof slug !== 'string' || !/^[a-z0-9-]+$/.test(slug)) return null;
+  const rows = await request(`series?select=id,title,slug&slug=eq.${encodeURIComponent(slug)}&limit=1`, token, {}, fetcher);
   return rows?.[0] || null;
 }
 
