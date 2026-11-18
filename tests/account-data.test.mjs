@@ -52,3 +52,15 @@ test('web favorite UI does not claim account sync before remote write succeeds',
   assert.ok(saveFn.includes('persistFavoritesLocally();\n    render();'));
   assert.ok(source.includes('storyForCatalogSeries(favorite.series)'));
 });
+
+test('title fallback returns slug for validating legacy identities', async () => {
+  const calls = [];
+  const fetcher = async url => {
+    calls.push(url);
+    return response([{ id: 'old', title: 'A Second Chance', slug: 'other-series' }]);
+  };
+  const { findSeriesByTitle } = await import('../dist/account/account-data.mjs');
+  const row = await findSeriesByTitle('my-session', 'A Second Chance', fetcher);
+  assert.equal(row.slug, 'other-series');
+  assert.match(calls[0], /series\?select=id,title,slug&title=eq.A%20Second%20Chance&limit=1/);
+});
