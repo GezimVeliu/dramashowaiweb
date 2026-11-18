@@ -41,6 +41,14 @@ export async function findSeriesByTitle(token, title, fetcher = fetch) {
   return rows?.[0] || null;
 }
 
+// Preserve cross-device favorites when an editorial display title changes.
+// The catalog uses a stable slug; reject malformed slugs before REST filters.
+export async function findSeriesBySlug(token, slug, fetcher = fetch) {
+  if (typeof slug !== 'string' || !/^[a-z0-9-]+$/.test(slug)) return null;
+  const rows = await request(`series?select=id,title,slug&slug=eq.${encodeURIComponent(slug)}&limit=1`, token, {}, fetcher);
+  return rows?.[0] || null;
+}
+
 export function joinLibrary({ watchlist = [], progress = [], series = [], episodes = [] }) {
   const seriesById = new Map(series.map(item => [item.id, item]));
   const episodeById = new Map(episodes.map(item => [item.id, item]));
