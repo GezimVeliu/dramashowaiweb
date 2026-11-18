@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { separatePrivateDocument, resolveStudioSlug, approvedDriveSourceLink } from '../dist/studio/guard.mjs';
+import { separatePrivateDocument, resolveStudioSlug, studioEpisodeTitle, imageAlreadyFailed, approvedDriveSourceLink } from '../dist/studio/guard.mjs';
 
 const file = path => readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
@@ -68,4 +68,33 @@ test('fallback does not publish private Drive bytes or bypass admin RLS', () => 
   assert.match(code, /studio_pages\?select=content_html/);
   assert.match(code, /rows\[0\]\.is_admin !== true/);
   assert.doesNotMatch(code, /setFilePermissions|storage\.from|update\(.*is_admin/);
+});
+
+test('private page title reflects the authorized E01-E03 route, not stale document title', () => {
+  assert.equal(studioEpisodeTitle('e01'), 'BONC Production Hub — E01');
+  assert.equal(studioEpisodeTitle('e02'), 'BONC Production Hub — E02');
+  assert.equal(studioEpisodeTitle('e03'), 'BONC Production Hub — E03');
+  assert.equal(studioEpisodeTitle('e04'), 'BONC Studio');
+  const source = file('dist/studio/guard.mjs');
+  assert.match(source, /document\.title = studioEpisodeTitle\(slug\)/);
+  assert.match(source, /renderPrivateDocument\(pages\[0\]\.content_html, slug\)/);
+});
+
+test('earlier image failures are recovered and not reported for pending images', () => {
+  const image = { tagName:'IMG', currentSrc:'https://example.test/still.png', complete:true, naturalWidth:0 };
+  assert.equal(imageAlreadyFailed(image),true);
+  assert.equal(imageAlreadyFailed({ ...image, complete:false }),false);
+  assert.equal(imageAlreadyFailed({ ...image, naturalWidth:200 }),false);
+  assert.equal(imageAlreadyFailed({ ...image, currentSrc:'', getAttribute:()=>null }),false);
+  assert.equal(imageAlreadyFailed({ tagName:'DIV', complete:true, naturalWidth:0, currentSrc:'x' }),false);
+  const guard = file('dist/studio/guard.mjs');
+  assert.match(guard, /document\.querySelectorAll\('img'\)\.forEach/);
+  assert.match(guard, /imageAlreadyFailed\(img\)/);
+});
+
+test('rich linked image cards never contain a clickable nested Drive fallback link', () => {
+  const source = file('dist/studio/guard.mjs');
+  assert.match(source, /source && \(!anchor \|\| mayReplaceAnchor\)/);
+  assert.match(source, /const target = mayReplaceAnchor \? anchor : image;/);
+  assert.match(source, /!image\.isConnected/);
 });

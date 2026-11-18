@@ -8,6 +8,17 @@ export function resolveStudioSlug(value) {
   return allowed.has(value) ? value : null;
 }
 
+export function studioEpisodeTitle(slug) {
+  const episode = resolveStudioSlug(slug);
+  return episode ? 'BONC Production Hub — ' + episode.toUpperCase() : 'BONC Studio';
+}
+
+export function imageAlreadyFailed(img) {
+  if (!img || img.tagName !== 'IMG') return false;
+  const source = img.currentSrc || img.getAttribute?.('src');
+  return Boolean(source && img.complete && img.naturalWidth === 0);
+}
+
 // The private DB document contains one inline application script. Inline JS is
 // deliberately prohibited by the public shell CSP. Extract it and run it from a
 // short-lived, same-origin-generated blob: URL after authenticated RLS retrieval.
@@ -53,9 +64,10 @@ export function approvedDriveSourceLink(candidate) {
 
 function showStudioImageFallback(event) {
   const image = event.target;
-  if (!image || image.tagName !== 'IMG') return;
+  if (!image || image.tagName !== 'IMG' || !image.isConnected) return;
   const anchor = image.closest('a[href]');
-  const source = approvedDriveSourceLink(anchor?.href);
+  const source = approvedDriveSourceLink(anchor?.href) || approvedDriveSourceLink(image.src);
+  const mayReplaceAnchor = anchor && anchor.children.length === 1 && anchor.contains(image);
   const fallback = document.createElement('span');
   fallback.setAttribute('role', 'note');
   fallback.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-height:90px;padding:14px;border:1px dashed #64748b;border-radius:10px;justify-content:center;align-items:center;text-align:center;font:13px/1.5 system-ui;color:#cbd5e1;background:#141820';
@@ -64,7 +76,7 @@ function showStudioImageFallback(event) {
     ? image.alt + ' — Preview unavailable'
     : 'Image preview unavailable';
   fallback.append(description);
-  if (source) {
+  if (source && (!anchor || mayReplaceAnchor)) {
     const link = document.createElement('a');
     link.href = source;
     link.target = '_blank';
@@ -74,23 +86,34 @@ function showStudioImageFallback(event) {
     fallback.append(link);
   } else {
     const note = document.createElement('span');
-    note.textContent = 'Source image could not be loaded. Please verify the original asset.';
+    note.textContent = source && anchor
+      ? 'Tap this image card to open the approved source in Google Drive.'
+      : 'Source image could not be loaded. Please verify the original asset.';
     fallback.append(note);
   }
-  // An original <a><img /></a> must be replaced as one unit so the fallback
-  // never nests clickable links. It does not grant access to a private file.
-  const target = anchor && anchor.children.length === 1 && anchor.contains(image)
-    ? anchor : image;
+  // Replacing a single-image anchor permits a link inside the fallback. If
+  // the card has other children, keep its outer anchor and use a non-link note:
+  // HTML forbids nested links and browser clicks must remain deterministic.
+  const target = mayReplaceAnchor ? anchor : image;
   target.replaceWith(fallback);
 }
 
-function renderPrivateDocument(html) {
+function renderPrivateDocument(html, slug) {
   const { markup, javascript } = separatePrivateDocument(html);
   const objectUrl = URL.createObjectURL(new Blob([javascript], { type: 'text/javascript' }));
   document.open();
   document.write(markup);
   document.close();
+  // E02/E03 stored documents are currently copied from the E01 template and
+  // retain the wrong <title>. Label the actual RLS-authorized route correctly.
+  document.title = studioEpisodeTitle(slug);
   document.addEventListener('error', showStudioImageFallback, true);
+  // Images may have failed before document.close() installed the capture
+  // listener. Recover these immediately; dynamically created images are
+  // covered by the capture-phase listener above.
+  document.querySelectorAll('img').forEach(img => {
+    if (imageAlreadyFailed(img)) showStudioImageFallback({ target: img });
+  });
 
   // A dynamically appended external script executes reliably after document.write(),
   // unlike inline scripts inserted after the document's initial parse.
@@ -138,7 +161,7 @@ async function initialize() {
     if (pages.length !== 1 || typeof pages[0].content_html !== 'string') {
       return decline('No authorized production material was returned.');
     }
-    renderPrivateDocument(pages[0].content_html);
+    renderPrivateDocument(pages[0].content_html, slug);
   } catch (error) {
     decline(error?.message || 'Studio authorization failed.');
   }
