@@ -37,7 +37,7 @@ export async function loadLibrary(token, fetcher = fetch) {
 }
 
 export async function findSeriesByTitle(token, title, fetcher = fetch) {
-  const rows = await request(`series?select=id,title&title=eq.${encodeURIComponent(title)}&limit=1`, token, {}, fetcher);
+  const rows = await request(`series?select=id,title,slug&title=eq.${encodeURIComponent(title)}&limit=1`, token, {}, fetcher);
   return rows?.[0] || null;
 }
 
