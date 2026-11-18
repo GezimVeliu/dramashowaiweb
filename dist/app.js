@@ -113,8 +113,17 @@ async function save(id) {
         // Exact-title fallback is for older catalog records only; never
         // introduce speculative aliases for differently named concepts.
         for (const title of story?.catalogTitles || [story?.title]) {
-          catalog = await findSeriesByTitle(accountSession.access_token, title);
-          if (catalog) break;
+          const candidate = await findSeriesByTitle(accountSession.access_token, title);
+          if (!candidate) continue;
+          // An exact historical title by itself is not proof of identity if
+          // the live catalog carries a *different* stable series slug.
+          // New concepts without catalogSlugs can still match a canonical
+          // title, but not a speculative legacy title.
+          if (candidate.slug && (story.catalogSlugs?.length || title !== story.title)) {
+            if (storyForCatalogSeries(candidate)?.id !== id) continue;
+          }
+          catalog = candidate;
+          break;
         }
       }
       if (catalog) remoteSeries.set(id, catalog);
